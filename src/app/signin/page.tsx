@@ -1,33 +1,54 @@
 'use client';
 
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 
-export default function SignupPage() {
+export default function SignInPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signup } = useAuth();
+  const auth = useAuth();
+  const router = useRouter();
+
+  // Check for existing session on component mount
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        router.push('/dashboard');
+      }
+    };
+    checkSession();
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (password !== confirmPassword) {
-      return setError("Passwords don't match");
-    }
-    
     setError('');
     setLoading(true);
 
     try {
-      const { success, error } = await signup(email, password);
-      if (!success && error) {
+      if (!auth) {
+        setError('Authentication not available');
+        return;
+      }
+      const { success, error } = await auth.login(email, password);
+      if (success) {
+        // Store remember me preference in localStorage
+        if (rememberMe) {
+          localStorage.setItem('rememberMe', 'true');
+        } else {
+          localStorage.removeItem('rememberMe');
+        }
+        router.push('/dashboard');
+      } else if (error) {
         setError(error);
       }
     } catch (err) {
-      setError('Failed to create an account');
+      setError('Failed to sign in. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -36,7 +57,8 @@ export default function SignupPage() {
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <form onSubmit={handleSubmit} className="border border-white/20 rounded-lg w-full max-w-md p-6">
-        <h1 className="text-white text-2xl font-bold mb-6">Create an account</h1>
+        <h1 className="text-white text-2xl font-bold mb-6">Welcome back</h1>
+        
         <div className="space-y-4 mb-6">
           <button
             type="button"
@@ -60,11 +82,13 @@ export default function SignupPage() {
             Continue with Google
           </button>
         </div>
+
         <div className="relative flex items-center justify-center mb-6">
           <div className="border-t border-white/20 flex-grow"></div>
           <span className="px-4 text-white/50 text-sm">or continue with email</span>
           <div className="border-t border-white/20 flex-grow"></div>
         </div>
+
         <div className="space-y-4">
           {error && (
             <div className="text-red-500 text-sm text-center p-2 bg-red-500/10 rounded-lg">
@@ -75,35 +99,45 @@ export default function SignupPage() {
             type="email"
             placeholder="Email"
             className="w-full h-10 px-4 rounded-3xl bg-black border border-white/20 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
+            required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            required
           />
-          <input
-            type="password"
-            placeholder="Password"
-            className="w-full h-10 px-4 rounded-3xl bg-black border border-white/20 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            placeholder="Confirm Password"
-            className="w-full h-10 px-4 rounded-3xl bg-black border border-white/20 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-          />
+          <div className="relative">
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full h-10 px-4 pr-10 rounded-3xl bg-transparent border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="••••••••"
+              required
+            />
+            <button
+              type="button"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            </button>
+          </div>
+          
+          <div className="text-right">
+            <a href="#" className="text-sm text-white hover:underline">Forgot password?</a>
+          </div>
+
           <button
             type="submit"
             className="w-full h-10 px-4 rounded-3xl bg-white text-black font-semibold hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50"
           >
-            {loading ? 'Creating account...' : 'Create account'}
+            {loading ? 'Signing in...' : 'Sign in'}
           </button>
+          
           <p className="text-center text-white/50 text-sm mt-4">
-            Already have an account?{' '}
-            <a href="/signin" className="text-white hover:underline">Sign in</a>
+            Don't have an account?{' '}
+            <a href="/" className="text-white hover:underline">Sign up</a>
           </p>
         </div>
       </form>
